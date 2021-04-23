@@ -1,4 +1,5 @@
 #!/bin/bash
+CUR_DIR=`pwd`
 SCRIPT=$(readlink -f "$0")
 SCRIPT_DIR=$(dirname "$SCRIPT")
 cd $SCRIPT_DIR
@@ -24,7 +25,7 @@ case ${init,,} in
 	parameters=" --num_train_epochs 3 \
 	--warmup 1000 \
 	--learning_rate 2e-5 \
-	--train_batch_size 64 \
+	--train_batch_size 1 \
 	--cls_drop_out 0.1 "
 		;;
 	large)
@@ -47,7 +48,7 @@ case ${init,,} in
 	parameters=" --num_train_epochs 3 \
 	--warmup 1000 \
 	--learning_rate 4e-6 \
-	--train_batch_size 64 \
+	--train_batch_size 4 \
 	--cls_drop_out 0.25 \
 	--fp16 True "
 		;;
@@ -71,7 +72,10 @@ case ${init,,} in
 		;;
 esac
 
-python -m DeBERTa.apps.run --model_config config.json  \
+cd ${CUR_DIR}
+export CUDA_VISIBLE_DEVICES=1,2,3,4
+export CUDA_VISIBLE_DEVICES=1
+python -m DeBERTa.apps.run --model_config ./experiments/glue/config.json \
 	--tag $tag \
 	--do_train \
 	--max_seq_len 256 \

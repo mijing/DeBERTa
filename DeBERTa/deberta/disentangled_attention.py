@@ -21,6 +21,11 @@ import pdb
 from .ops import *
 from .da_utils import build_relative_position
 
+import matplotlib.pyplot as plt
+import pandas as pd
+import matplotlib.ticker as ticker
+import time, copy, os
+
 from ..utils import get_logger
 logger=get_logger()
 
@@ -65,8 +70,40 @@ class DisentangledSelfAttention(nn.Module):
         new_x_shape = x.size()[:-1] + (attention_heads, -1)
         x = x.view(*new_x_shape)
         return x.permute(0, 2, 1, 3).contiguous().view(-1, x.size(1), x.size(-1))
+    
+    def picture(self, att_probs):
+        tmp = att_probs
+        l = (tmp[0]>0).sum()
+        if l >= 100:
+            return
+        variables = [str(i) for i in range(l)]
+        labels = copy.deepcopy(variables)
+        tmp = tmp[:l, :l]
+        print('tmp.sum(dim=-1)', tmp.sum(dim=-1))
+        print('tmp.argmax(dim=-1)', tmp.argmax(dim=-1))
+        tmp = tmp.cpu().data.numpy()
+        df = pd.DataFrame(tmp, columns=variables, index=labels)
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        cax = ax.matshow(df, interpolation='nearest', cmap='hot_r')
+        fig.colorbar(cax)
 
-    def forward(self, hidden_states, attention_mask, return_att=False, query_states=None, relative_pos=None, rel_embeddings=None):
+        tick_spacing = int(l//10)
+        if tick_spacing < 1:
+            tick_spacing = 1
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+        ax.xaxis.set_ticks_position('bottom')
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+         
+        ax.set_xticklabels([''] + list(df.columns))
+        ax.set_yticklabels([''] + list(df.index))
+        if not os.path.exists('pics/'):
+            os.mkdir('pics/')
+        plt.savefig('pics/' + str(time.time()) + '.jpg')
+
+    def forward(self, hidden_states, attention_mask, return_att=False, query_states=None,
+            relative_pos=None, rel_embeddings=None, layer_i=None):
         if query_states is None:
             query_states = hidden_states
         query_layer = self.transpose_for_scores(self.query_proj(query_states), self.num_attention_heads)
@@ -85,7 +122,7 @@ class DisentangledSelfAttention(nn.Module):
         scale = math.sqrt(query_layer.size(-1)*scale_factor)
         attention_scores = torch.bmm(query_layer, key_layer.transpose(-1, -2))/scale
         if self.relative_attention:
-            rel_embeddings = self.pos_dropout(rel_embeddings)
+            rel_embeddings = self.pos_dropout(rel_embeddings) # rel_embeddings: 2*k*hiden_size=2*512*1024
             rel_att = self.disentangled_attention_bias(query_layer, key_layer, relative_pos, rel_embeddings, scale_factor)
 
         if rel_att is not None:
@@ -95,6 +132,13 @@ class DisentangledSelfAttention(nn.Module):
 
         # bxhxlxd
         _attention_probs = XSoftmax.apply(attention_scores, attention_mask, -1)
+        rel_att_tmp = rel_att.view(-1, self.num_attention_heads, attention_scores.size(-2), attention_scores.size(-1))
+        rel_att_tmp = XSoftmax.apply(rel_att_tmp, attention_mask, -1)
+        assert (layer_i != None) # 保证参数传进来了
+        if layer_i == 11:
+            #self.picture(rel_att_tmp[0][0])
+            self.picture(_attention_probs[0][0])
+
         attention_probs = self.dropout(_attention_probs)
         context_layer = torch.bmm(attention_probs.view(-1, attention_probs.size(-2), attention_probs.size(-1)), value_layer)
         context_layer = context_layer.view(-1, self.num_attention_heads, context_layer.size(-2), context_layer.size(-1)).permute(0, 2, 1, 3).contiguous()

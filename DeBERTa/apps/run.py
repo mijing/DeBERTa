@@ -249,9 +249,9 @@ def main(args):
     test_data = task.test_data(max_seq_len=args.max_seq_length)
     logger.info("  Prediction batch size = %d", args.predict_batch_size)
 
-  if args.do_train:
+  if args.do_train: # load数据
     train_data = task.train_data(max_seq_len=args.max_seq_length, debug=args.debug)
-  model_class_fn = task.get_model_class_fn()
+  model_class_fn = task.get_model_class_fn() # 这是一个获取类的函数
   model = create_model(args, len(label_list), model_class_fn)
   if args.do_train:
     with open(os.path.join(args.output_dir, 'model_config.json'), 'w', encoding='utf-8') as fs:
@@ -388,11 +388,9 @@ def build_argument_parser():
             type=str,
             help="The path of the vocabulary")
   return parser
-
 if __name__ == "__main__":
   parser = build_argument_parser()
   parser.parse_known_args()
-
   args = parser.parse_args()
   os.makedirs(args.output_dir, exist_ok=True)
   logger = set_logger(args.task_name, os.path.join(args.output_dir, 'training_{}.log'.format(args.task_name)))

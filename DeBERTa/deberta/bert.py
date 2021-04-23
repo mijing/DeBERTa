@@ -45,8 +45,10 @@ class BertAttention(nn.Module):
     self.output = BertSelfOutput(config)
     self.config = config
 
-  def forward(self, hidden_states, attention_mask, return_att=False, query_states=None, relative_pos=None, rel_embeddings=None):
-    output = self.self(hidden_states, attention_mask, return_att, query_states=query_states, relative_pos=relative_pos, rel_embeddings=rel_embeddings)
+  def forward(self, hidden_states, attention_mask, return_att=False, query_states=None,
+          relative_pos=None, rel_embeddings=None, layer_i=None):
+    output = self.self(hidden_states, attention_mask, return_att, query_states=query_states,
+            relative_pos=relative_pos, rel_embeddings=rel_embeddings, layer_i=layer_i)
     self_output, att_matrix, att_logits_=output['hidden_states'], output['attention_probs'], output['attention_logits']
     if query_states is None:
       query_states = hidden_states
@@ -91,9 +93,11 @@ class BertLayer(nn.Module):
     self.intermediate = BertIntermediate(config)
     self.output = BertOutput(config)
 
-  def forward(self, hidden_states, attention_mask, return_att=False, query_states=None, relative_pos=None, rel_embeddings=None):
+  def forward(self, hidden_states, attention_mask, return_att=False, query_states=None,
+          relative_pos=None, rel_embeddings=None, layer_i=None):
     attention_output = self.attention(hidden_states, attention_mask, return_att=return_att, \
-      query_states=query_states, relative_pos=relative_pos, rel_embeddings=rel_embeddings)
+      query_states=query_states, relative_pos=relative_pos, rel_embeddings=rel_embeddings,
+      layer_i=layer_i)
     if return_att:
       attention_output, att_matrix = attention_output
     intermediate_output = self.intermediate(attention_output)
@@ -191,7 +195,8 @@ class BertEncoder(nn.Module):
       next_kv = hidden_states
     rel_embeddings = self.get_rel_embedding()
     for i, layer_module in enumerate(self.layer):
-      output_states = layer_module(next_kv, attention_mask, return_att, query_states = query_states, relative_pos=relative_pos, rel_embeddings=rel_embeddings)
+      output_states = layer_module(next_kv, attention_mask, return_att, query_states = query_states,
+              relative_pos=relative_pos, rel_embeddings=rel_embeddings, layer_i=i)
       if return_att:
         output_states, att_m = output_states
 

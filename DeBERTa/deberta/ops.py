@@ -20,6 +20,7 @@ else:
 
 __all__ = ['StableDropout', 'MaskedLayerNorm', 'XSoftmax', 'ACT2FN', 'LayerNorm']
 
+# traceable是用来做什么的???
 @traceable
 class XSoftmax(torch.autograd.Function):
   """ Masked Softmax which is optimized for saving memory
